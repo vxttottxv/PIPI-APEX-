@@ -209,6 +209,27 @@ void main() {
       expect(find.byType(CalendarScreen), findsOneWidget);
       expect(find.text('캘린더 보기'), findsWidgets);
     });
+
+    testWidgets('HomeScreen room adapts cleanly across phone and desktop viewports',
+        (tester) async {
+      addTearDown(() => tester.view.resetPhysicalSize());
+      for (final size in [
+        const Size(375, 667),
+        const Size(360, 840),
+        const Size(1280, 800),
+      ]) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1.0;
+        final app = await createTestApp(home: const HomeScreen());
+        await tester.pumpWidget(app);
+        await tester.pump(const Duration(milliseconds: 120));
+
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(find.text('놀아주기'), findsOneWidget);
+        expect(find.text('밥 주기'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    });
   });
 
   group('PixelButton Press Animation Tests', () {

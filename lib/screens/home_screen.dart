@@ -327,49 +327,97 @@ class _HomeScreenState extends State<HomeScreen> {
         _behaviorStatusText(character, _currentBehavior) ??
         speechQuotes[_quoteIndex % speechQuotes.length];
 
+    final screenH = MediaQuery.sizeOf(context).height;
+    final characterSize = (screenH * 0.24).clamp(135.0, 215.0);
+    final characterBottom = (screenH * 0.19).clamp(100.0, 175.0);
+
     return Scaffold(
       backgroundColor: const Color(0xFF35535E),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── 1. 메인 배경: 기기 비율에 맞춘 일본식 야경 픽셀 룸 (버튼 오버레이 없는 순수 배경) ──
+          // ── 1. 메인 배경: 어떤 기종(소형/대형/폴더블/태블릿/웹)이든 비율·가구 잘림 없이 자동 맞춤 ──
           LayoutBuilder(
             builder: (context, constraints) {
-              final aspect = constraints.maxHeight > 0
-                  ? constraints.maxWidth / constraints.maxHeight
-                  : 0.5;
-              if (aspect <= 0.65) {
-                return Image.asset(
-                  'assets/rooms/room_pixel_night.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.none,
-                );
-              }
-              return DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF2F4A5C),
-                      Color(0xFF35535E),
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              final aspect = h > 0 ? w / h : 0.5;
+              final isWide = aspect > 0.72;
+              final stageW = isWide ? (h * 0.62).clamp(360.0, w) : w;
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 천장(#2F4A5C)과 바닥(#35535E) 색상을 기종 비율에 맞게 자동 연장
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: ColoredBox(color: Color(0xFF2F4A5C))),
+                      Expanded(child: ColoredBox(color: Color(0xFF35535E))),
                     ],
                   ),
-                ),
-                child: Image.asset(
-                  'assets/rooms/room_pixel_night.png',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.none,
-                ),
+                  if (isWide) ...[
+                    Opacity(
+                      opacity: 0.22,
+                      child: Image.asset(
+                        'assets/rooms/room_pixel_night.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.low,
+                      ),
+                    ),
+                    const ColoredBox(color: Color(0x551F3545)),
+                  ],
+                  Center(
+                    child: SizedBox(
+                      width: stageW,
+                      height: h,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRect(
+                            child: OverflowBox(
+                              minWidth: stageW,
+                              maxWidth: stageW,
+                              minHeight: 0,
+                              maxHeight: double.infinity,
+                              alignment: Alignment.center,
+                              child: Image.asset(
+                                'assets/rooms/room_pixel_night.png',
+                                width: stageW,
+                                fit: BoxFit.fitWidth,
+                                filterQuality: FilterQuality.none,
+                              ),
+                            ),
+                          ),
+                          if (isWide)
+                            const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  stops: [0.0, 0.06, 0.94, 1.0],
+                                  colors: [
+                                    Color(0xFF243B4A),
+                                    Colors.transparent,
+                                    Colors.transparent,
+                                    Color(0xFF243B4A),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
 
           // ── 2. 중앙 캐릭터: 방 한가운데 앉아 무한 픽셀 애니메이션 구동 ──
           Positioned(
-            bottom: MediaQuery.sizeOf(context).height < 720 ? 130 : 170,
+            bottom: characterBottom,
             left: 0,
             right: 0,
             child: GestureDetector(
@@ -438,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 24시간 무한 루프 + 클릭/유휴(3초+) 반응형 픽셀 캐릭터
                   CharacterView(
                     characterType: character.characterType,
-                    size: 200,
+                    size: characterSize,
                     animated: true,
                     colorHex: character.color,
                     enableRoam: true,
@@ -459,8 +507,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // ── 3. 상단 상태바: [🍪 간식] & [💖 애정도] & 우측 메뉴 ──
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
-            left: 16,
-            right: 16,
+            left: MediaQuery.sizeOf(context).width < 390 ? 10 : 16,
+            right: MediaQuery.sizeOf(context).width < 390 ? 10 : 16,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +614,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: PixelColors.textDark,
                                         ),
                                       ),
-                                      const SizedBox(width: 14),
+                                      SizedBox(
+                                        width: MediaQuery.sizeOf(context).width < 390
+                                            ? 6
+                                            : 14,
+                                      ),
                                       Text(
                                         '${character.intimacy} / 100',
                                         style: const TextStyle(
@@ -579,7 +631,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Container(
-                                    width: 96,
+                                    width: MediaQuery.sizeOf(context).width < 390
+                                        ? 66
+                                        : 96,
                                     height: 11,
                                     decoration: BoxDecoration(
                                       border: Border.all(
