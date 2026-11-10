@@ -238,34 +238,70 @@ class AuthRepository {
     return storedUser;
   }
 
+  static const String _socialAccountsPrefix = 'pipi_social_accounts_';
+
+  /// 해당 소셜 플랫폼으로 최근 로그인한 계정(이메일/별명) 목록 조회
+  Future<List<String>> getRememberedSocialAccounts(
+    SocialProvider provider,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('$_socialAccountsPrefix${provider.name}') ?? [];
+  }
+
+  Future<void> _rememberSocialAccount(
+    SharedPreferences prefs,
+    SocialProvider provider,
+    String accountIdentifier,
+  ) async {
+    final trimmed = accountIdentifier.trim();
+    if (trimmed.isEmpty) return;
+    final key = '$_socialAccountsPrefix${provider.name}';
+    final existing = prefs.getStringList(key) ?? [];
+    final updated = [trimmed, ...existing.where((e) => e != trimmed)];
+    await prefs.setStringList(key, updated.take(5).toList());
+  }
+
+  String _resolveSocialUserId(
+    SocialProvider provider,
+    String? accountIdentifier,
+  ) {
+    final raw = (accountIdentifier ?? '').trim().toLowerCase();
+    if (raw.isEmpty) {
+      return provider == SocialProvider.kakao ? 'kakao_user' : 'google_user';
+    }
+    final sanitized = raw.replaceAll(RegExp(r'[^a-z0-9._@-]'), '_');
+    final clipped =
+        sanitized.length > 60 ? sanitized.substring(0, 60) : sanitized;
+    final prefix = '${provider.name}_';
+    return clipped.startsWith(prefix) ? clipped : '$prefix$clipped';
+  }
+
   /// 소셜 연동 로그인 (카카오 / 구글)
-  /// 
-  /// 명세서 개발 원칙:
-  /// - 모든 데이터 처리는 `repositories/` 클래스로만 하여 나중에 백엔드 API로 교체하기 쉽게 설계
-  /// 
+  ///
   /// [provider]: 소셜 플랫폼 구분 ([SocialProvider.kakao] 또는 [SocialProvider.google])
-  /// 
-  /// 💡 작동 방식 (현재 로컬 목업 단계):
-  /// 1. 카카오 로그인: 'kakao_user' 고유 ID 생성 또는 기존 계정 조회
-  /// 2. 구글 로그인: 'google_user' 고유 ID 생성 또는 기존 계정 조회
-  /// 3. 사용자별 격리 저장소에 계정 정보 등록 및 로그인 세션 저장
-  /// 
-  /// 🔗 추후 백엔드 API 및 실제 SDK 연동 시:
-  /// - kakao_flutter_sdk / google_sign_in 패키지를 통해 OAuth 토큰을 발급받고
-  /// - 백엔드 서버(POST /api/auth/social)로 토큰을 전송하여 검증 및 세션 토큰을 발급받도록 이 메서드 내부만 교체합니다.
+  /// [accountIdentifier]: 사용자가 소셜 로그인 창에서 선택/입력한 계정 이메일 또는 ID
   Future<User> loginWithSocial({
     required SocialProvider provider,
+    String? accountIdentifier,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final socialId = provider == SocialProvider.kakao ? 'kakao_user' : 'google_user';
+    final trimmedAccount = accountIdentifier?.trim();
+    final socialId = _resolveSocialUserId(provider, trimmedAccount);
+    if (trimmedAccount != null && trimmedAccount.isNotEmpty) {
+      await _rememberSocialAccount(prefs, provider, trimmedAccount);
+    }
 
     // 백엔드 API 소셜 로그인 우선 시도
     try {
       final apiRes = await ApiClient.instance.request(
         'POST',
         '/api/auth/social',
-        body: {'provider': provider.name},
+        body: {
+          'provider': provider.name,
+          if (trimmedAccount != null && trimmedAccount.isNotEmpty)
+            'accountId': trimmedAccount,
+        },
         withAuth: false,
       );
       if (apiRes != null && apiRes['user'] is Map<String, dynamic>) {
@@ -275,9 +311,10 @@ class AuthRepository {
         }
         final userMap = apiRes['user'] as Map<String, dynamic>;
         final apiUser = User.fromJson(userMap);
+        final resolvedId = apiUser.id.isNotEmpty ? apiUser.id : socialId;
         await prefs.setString(
-            '$_userDataPrefix$socialId', jsonEncode(apiUser.toJson()));
-        await prefs.setString(_currentUserIdKey, socialId);
+            '$_userDataPrefix$resolvedId', jsonEncode(apiUser.toJson()));
+        await prefs.setString(_currentUserIdKey, resolvedId);
         return apiUser;
       }
     } on ApiHttpException catch (e) {

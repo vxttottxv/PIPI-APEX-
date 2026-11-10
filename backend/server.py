@@ -15,6 +15,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -196,8 +197,17 @@ class PipiDatabase:
                 "introSeen": bool(row["intro_seen"]),
             }, token
 
-    def social_login(self, provider: str) -> tuple[dict[str, Any], str]:
-        social_id = "kakao_user" if provider == "kakao" else "google_user"
+    def social_login(
+        self, provider: str, account_id: Optional[str] = None
+    ) -> tuple[dict[str, Any], str]:
+        normalized_provider = "kakao" if provider == "kakao" else "google"
+        raw_acc = (account_id or "").strip().lower()
+        if raw_acc:
+            safe_acc = re.sub(r"[^a-z0-9._@-]", "_", raw_acc)[:60]
+            prefix = f"{normalized_provider}_"
+            social_id = safe_acc if safe_acc.startswith(prefix) else f"{prefix}{safe_acc}"
+        else:
+            social_id = f"{normalized_provider}_user"
         with self._lock, self._connect() as conn:
             row = conn.execute(
                 "SELECT id, password_hash, created_at, intro_seen FROM users WHERE id = ?",
@@ -688,7 +698,10 @@ class PipiRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(HTTPStatus.OK, {"user": user, "token": token})
                 return
             if path == "/api/auth/social":
-                user, token = self.db.social_login(data.get("provider", "kakao"))
+                user, token = self.db.social_login(
+                    data.get("provider", "kakao"),
+                    account_id=data.get("accountId") or data.get("email"),
+                )
                 self._send_json(HTTPStatus.OK, {"user": user, "token": token})
                 return
             if path == "/api/auth/logout":

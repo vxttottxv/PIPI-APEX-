@@ -153,6 +153,24 @@ class PipiBackendApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 404)
 
+        # 8. Social login isolates distinct accountId entries
+        status, k_res = self._request(
+            "POST",
+            "/api/auth/social",
+            {"provider": "kakao", "accountId": "demo1@kakao.com"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(k_res["user"]["id"], "kakao_demo1@kakao.com")
+
+        status, g_res = self._request(
+            "POST",
+            "/api/auth/social",
+            {"provider": "google", "accountId": "demo2@gmail.com"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(g_res["user"]["id"], "google_demo2@gmail.com")
+        self.assertNotEqual(k_res["token"], g_res["token"])
+
 
 if __name__ == "__main__":
     unittest.main()

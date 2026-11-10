@@ -9,6 +9,7 @@ import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/pipi_logo.dart';
 import '../widgets/social_login_button.dart';
+import '../widgets/social_oauth_dialog.dart';
 import 'character_selection_screen.dart';
 import 'home_screen.dart';
 import 'intro_story_screen.dart';
@@ -112,16 +113,31 @@ class _LoginScreenState extends State<LoginScreen> {
     // 키보드 내리기
     FocusScope.of(context).unfocus();
 
-    setState(() {
-      _socialLoadingType = type;
-    });
-
     final authProvider = context.read<AuthProvider>();
     final provider = type == SocialLoginType.kakao
         ? SocialProvider.kakao
         : SocialProvider.google;
 
-    final success = await authProvider.loginWithSocial(provider);
+    final remembered = await authProvider.getRememberedSocialAccounts(provider);
+    if (!mounted) return;
+
+    final selectedAccount = await showSocialOAuthDialog(
+      context: context,
+      type: type,
+      rememberedAccounts: remembered,
+    );
+    if (!mounted || selectedAccount == null || selectedAccount.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _socialLoadingType = type;
+    });
+
+    final success = await authProvider.loginWithSocial(
+      provider,
+      accountIdentifier: selectedAccount.trim(),
+    );
 
     if (!mounted) return;
 

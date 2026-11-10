@@ -120,17 +120,31 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// 최근 사용한 소셜 계정 목록 조회
+  Future<List<String>> getRememberedSocialAccounts(
+    SocialProvider provider,
+  ) {
+    return _authRepository.getRememberedSocialAccounts(provider);
+  }
+
   /// 소셜 연동 로그인 (카카오 / 구글)
   /// 
   /// [provider]: 소셜 플랫폼 구분 ([SocialProvider.kakao] 또는 [SocialProvider.google])
+  /// [accountIdentifier]: 계정 선택/동의 창에서 선택·입력한 이메일 또는 아이디
   /// 성공 시 true, 실패 시 false 반환 및 [errorMessage] 설정
-  Future<bool> loginWithSocial(SocialProvider provider) async {
+  Future<bool> loginWithSocial(
+    SocialProvider provider, {
+    String? accountIdentifier,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final user = await _authRepository.loginWithSocial(provider: provider);
+      final user = await _authRepository.loginWithSocial(
+        provider: provider,
+        accountIdentifier: accountIdentifier,
+      );
       _currentUser = user;
       _isLoading = false;
       notifyListeners();
