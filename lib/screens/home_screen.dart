@@ -328,20 +328,48 @@ class _HomeScreenState extends State<HomeScreen> {
         speechQuotes[_quoteIndex % speechQuotes.length];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF2C4C72),
+      backgroundColor: const Color(0xFF35535E),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── 1. 메인 배경: 일본식 야경 픽셀 룸 ──
-          Image.asset(
-            'assets/rooms/room_pixel_night.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+          // ── 1. 메인 배경: 기기 비율에 맞춘 일본식 야경 픽셀 룸 (버튼 오버레이 없는 순수 배경) ──
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final aspect = constraints.maxHeight > 0
+                  ? constraints.maxWidth / constraints.maxHeight
+                  : 0.5;
+              if (aspect <= 0.65) {
+                return Image.asset(
+                  'assets/rooms/room_pixel_night.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.none,
+                );
+              }
+              return DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF2F4A5C),
+                      Color(0xFF35535E),
+                    ],
+                  ),
+                ),
+                child: Image.asset(
+                  'assets/rooms/room_pixel_night.png',
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.none,
+                ),
+              );
+            },
           ),
 
           // ── 2. 중앙 캐릭터: 방 한가운데 앉아 무한 픽셀 애니메이션 구동 ──
           Positioned(
-            bottom: 175,
+            bottom: MediaQuery.sizeOf(context).height < 720 ? 130 : 170,
             left: 0,
             right: 0,
             child: GestureDetector(
