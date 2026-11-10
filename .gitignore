@@ -52,3 +52,4 @@ backend/*.db
 backend/*.db-journal
 backend/__pycache__/
 __pycache__/
+demo_qr.png

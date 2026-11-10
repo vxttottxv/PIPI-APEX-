@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import mimetypes
 import os
 import secrets
 import sqlite3
@@ -21,10 +22,18 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB_PATH = os.path.join(BASE_DIR, "pipi.db")
+DEFAULT_WEB_DIR = os.path.realpath(
+    os.environ.get("WEB_BUILD_DIR") or os.path.join(BASE_DIR, "..", "build", "web")
+)
+
+mimetypes.add_type("application/wasm", ".wasm")
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("model/gltf-binary", ".glb")
+mimetypes.add_type("font/ttf", ".ttf")
 
 
 def utc_now_iso() -> str:
@@ -507,9 +516,10 @@ class PipiDatabase:
 
 
 class PipiRequestHandler(BaseHTTPRequestHandler):
-    """CORS 및 JSON API 라우팅 핸들러."""
+    """CORS, JSON API 및 Flutter Web 정적 파일 라우팅 핸들러."""
 
     db: PipiDatabase  # 주입됨
+    web_dir: str = DEFAULT_WEB_DIR
 
     def log_message(self, format: str, *args: Any) -> None:
         return  # 테스트/콘솔 출력 깔끔하게 유지
@@ -531,6 +541,59 @@ class PipiRequestHandler(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(body)
+
+    def _serve_static(self, path: str, head_only: bool = False) -> None:
+        web_root = os.path.realpath(self.web_dir)
+        if not os.path.isdir(web_root):
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+            return
+
+        rel_path = unquote(path).lstrip("/")
+        if not rel_path:
+            rel_path = "index.html"
+
+        target = os.path.realpath(os.path.join(web_root, rel_path))
+        if not (target == web_root or target.startswith(web_root + os.sep)):
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Forbidden"})
+            return
+
+        if os.path.isdir(target):
+            target = os.path.join(target, "index.html")
+
+        if not os.path.isfile(target):
+            # SPA 라우트 폴백 (확장자 없는 경로는 index.html 제공)
+            if "." not in os.path.basename(rel_path):
+                index_file = os.path.join(web_root, "index.html")
+                if os.path.isfile(index_file):
+                    target = index_file
+                else:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+                    return
+            else:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+                return
+
+        mime_type, _ = mimetypes.guess_type(target)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+        if mime_type.startswith("text/") or mime_type in (
+            "application/javascript",
+            "application/json",
+        ):
+            content_type = f"{mime_type}; charset=utf-8"
+        else:
+            content_type = mime_type
+
+        with open(target, "rb") as f:
+            data = f.read()
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self._send_cors_headers()
+        self.end_headers()
+        if not head_only:
+            self.wfile.write(data)
 
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
@@ -558,8 +621,21 @@ class PipiRequestHandler(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
 
+    def do_HEAD(self) -> None:
+        path = urlparse(self.path).path
+        if not path.startswith("/api/"):
+            self._serve_static(path, head_only=True)
+            return
+        self.send_response(HTTPStatus.OK if path == "/api/health" else HTTPStatus.NO_CONTENT)
+        self._send_cors_headers()
+        self.end_headers()
+
     def do_GET(self) -> None:
         path = urlparse(self.path).path
+
+        if not path.startswith("/api/"):
+            self._serve_static(path)
+            return
 
         if path == "/api/health":
             self._send_json(HTTPStatus.OK, {"status": "ok", "service": "pipi-backend"})
@@ -706,7 +782,10 @@ class PipiRequestHandler(BaseHTTPRequestHandler):
 
 
 def create_server(
-    host: str = "0.0.0.0", port: int = 3000, db_path: str = DEFAULT_DB_PATH
+    host: str = "0.0.0.0",
+    port: int = 3000,
+    db_path: str = DEFAULT_DB_PATH,
+    web_dir: str = DEFAULT_WEB_DIR,
 ) -> ThreadingHTTPServer:
     db = PipiDatabase(db_path=db_path)
 
@@ -714,6 +793,7 @@ def create_server(
         pass
 
     BoundHandler.db = db
+    BoundHandler.web_dir = web_dir
     return ThreadingHTTPServer((host, port), BoundHandler)
 
 

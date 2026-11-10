@@ -26,12 +26,23 @@ class ApiClient {
   static final ApiClient instance = ApiClient._internal();
 
   static const String _tokenKey = 'pipi_api_bearer_token';
-  static const Duration _timeout = Duration(milliseconds: 1200);
+  static const Duration _timeout = Duration(seconds: 4);
 
   String get baseUrl {
     const defined = String.fromEnvironment('API_BASE_URL');
     if (defined.isNotEmpty) return defined;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    if (kIsWeb) {
+      final origin = Uri.base;
+      if (origin.host.endsWith('github.io')) {
+        return '';
+      }
+      if ((origin.scheme == 'http' || origin.scheme == 'https') &&
+          origin.port != 8080) {
+        return origin.origin;
+      }
+      return 'http://localhost:3000';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:3000';
     }
     return 'http://localhost:3000';
@@ -62,7 +73,9 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool withAuth = true,
   }) async {
-    final uri = Uri.parse('$baseUrl$path');
+    final base = baseUrl;
+    if (base.isEmpty) return null;
+    final uri = Uri.parse('$base$path');
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
