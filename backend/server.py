@@ -559,6 +559,8 @@ class PipiRequestHandler(BaseHTTPRequestHandler):
             return
 
         rel_path = unquote(path).lstrip("/")
+        if rel_path == "PIPI-APEX-" or rel_path.startswith("PIPI-APEX-/"):
+            rel_path = rel_path[len("PIPI-APEX-") :].lstrip("/")
         if not rel_path:
             rel_path = "index.html"
 
