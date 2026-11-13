@@ -62,3 +62,4 @@ else
   echo "cloudflared not found. Keeping local server running..."
   wait "$SERVER_PID"
 fi
+
