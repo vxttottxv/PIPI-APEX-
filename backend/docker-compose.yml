@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    container_name: pipi-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      - DB_PATH=/app/data/pipi.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

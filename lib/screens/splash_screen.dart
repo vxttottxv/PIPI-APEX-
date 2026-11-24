@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/kakao_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/character_provider.dart';
+import '../services/kakao_web_helper.dart';
 import '../theme/app_colors.dart';
 import '../widgets/pipi_logo.dart';
 import 'character_selection_screen.dart';
@@ -59,9 +62,78 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initAppAndNavigate() async {
     final startTime = DateTime.now();
+    final authProvider = context.read<AuthProvider>();
+
+    // 0. 웹 환경에서 카카오 OAuth 2.0 리다이렉트 콜백 파라미터 확인 및 처리
+    if (kIsWeb) {
+      final kakaoError = getUrlQueryParam('error');
+      if (kakaoError != null) {
+        final errorDesc =
+            getUrlQueryParam('error_description') ?? '카카오 로그인이 취소되었습니다.';
+        cleanUrlQueryParams();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LoginScreen(initialErrorMessage: errorDesc),
+            ),
+          );
+          return;
+        }
+      }
+
+      final kakaoCode = getUrlQueryParam('code');
+      if (kakaoCode != null && kakaoCode.isNotEmpty) {
+        cleanUrlQueryParams();
+        final redirectUri = KakaoConfig.getEffectiveRedirectUri();
+        final success = await authProvider.handleKakaoWebAuthCode(
+          code: kakaoCode,
+          redirectUri: redirectUri,
+        );
+
+        if (!mounted) return;
+
+        if (success && authProvider.currentUser != null) {
+          final user = authProvider.currentUser!;
+          final characterProvider = context.read<CharacterProvider>();
+          await characterProvider.loadCharacter(user.id);
+          if (!mounted) return;
+
+          if (characterProvider.hasCharacter) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+            return;
+          } else {
+            final seenIntro = await IntroStoryScreen.hasSeenIntro(user.id);
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => seenIntro
+                    ? const CharacterSelectionScreen()
+                    : IntroStoryScreen(userId: user.id),
+              ),
+            );
+            return;
+          }
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LoginScreen(
+                initialErrorMessage:
+                    authProvider.errorMessage ?? '카카오 웹 로그인 처리에 실패했습니다.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
 
     // 자동 로그인 세션 확인
-    final authProvider = context.read<AuthProvider>();
     final isLoggedIn = await authProvider.checkAutoLogin();
 
     // 최소 1.5초(1500ms) 동안 스플래시 화면 노출 보장 (명세서 규칙)

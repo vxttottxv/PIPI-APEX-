@@ -47,7 +47,13 @@ void main() {
         expect(type.description.isNotEmpty, true);
         expect(type.tag.isNotEmpty, true);
         expect(type.speechQuotes.isNotEmpty, true);
-        expect(type.paletteOptions.length, greaterThanOrEqualTo(3));
+        if (type == CharacterType.duck || type == CharacterType.axolotl) {
+          expect(type.paletteOptions.isEmpty, true);
+        } else {
+          expect(type.paletteOptions.length, greaterThanOrEqualTo(5));
+          expect(type.paletteOptions.first.id, equals('default'));
+          expect(type.paletteOptions.first.isDefault, isTrue);
+        }
         expect(type.playActivityName.isNotEmpty, true);
       }
     });

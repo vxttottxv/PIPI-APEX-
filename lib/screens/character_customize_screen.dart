@@ -679,12 +679,17 @@ class _CharacterCustomizeScreenState extends State<CharacterCustomizeScreen> {
                                       const Icon(Icons.check_circle_rounded,
                                           size: 20),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        '\'${_nameController.text.trim().isEmpty ? widget.characterType.koreanName : _nameController.text.trim()}\'(으)로 PIPI 시작하기',
-                                        style: const TextStyle(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: -0.3,
+                                      Expanded(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            '\'${_nameController.text.trim().isEmpty ? widget.characterType.koreanName : _nameController.text.trim()}\'(으)로 PIPI 시작하기',
+                                            style: const TextStyle(
+                                              fontSize: 15.5,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],

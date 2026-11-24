@@ -292,6 +292,167 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 캐릭터 색상 실시간 변경 모달 (로컬 단독 저장)
+  Future<void> _showColorChangeDialog(
+      String userId, Character character) async {
+    final type = character.characterType;
+    final options = type.paletteOptions;
+    if (options.isEmpty) return;
+
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final currentColorHex =
+                context.watch<CharacterProvider>().currentCharacter?.color ??
+                    character.color;
+
+            final isCapy = type == CharacterType.capybara;
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+              child: PixelBox(
+                step: 6.0,
+                shadowOffset: 5.0,
+                backgroundColor: const Color(0xFFF0F6FF),
+                borderColor: PixelColors.borderDark,
+                borderWidth: 2.8,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(isCapy ? '🦫' : '🎨', style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 8),
+                        Text(
+                          isCapy ? '카피바라 브라운 톤' : '캐릭터 색상 변경',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: PixelColors.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 120,
+                      child: Center(
+                        child: CharacterView(
+                          characterType: type,
+                          size: 110,
+                          animated: true,
+                          colorHex: currentColorHex,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 10,
+                      children: options.map((opt) {
+                        final isSelected = currentColorHex == opt.id ||
+                            currentColorHex == opt.hex;
+                        return GestureDetector(
+                          onTap: () async {
+                            await context
+                                .read<CharacterProvider>()
+                                .updateLocalColor(userId, opt.id);
+                            setDialogState(() {});
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: opt.color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? PixelColors.primaryBlueDark
+                                        : PixelColors.borderDark,
+                                    width: isSelected ? 3.0 : 1.5,
+                                  ),
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                            color: PixelColors.primaryBlueLight
+                                                .withValues(alpha: 0.8),
+                                            blurRadius: 5,
+                                            spreadRadius: 1,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: opt.isDefault
+                                    ? Center(
+                                        child: Icon(
+                                          Icons.auto_awesome,
+                                          size: 16,
+                                          color: opt.color
+                                                      .computeLuminance() >
+                                                  0.5
+                                              ? Colors.black87
+                                              : Colors.white,
+                                        ),
+                                      )
+                                    : (isSelected
+                                        ? Center(
+                                            child: Icon(
+                                              Icons.check_rounded,
+                                              size: 18,
+                                              color: opt.color
+                                                          .computeLuminance() >
+                                                      0.5
+                                                  ? Colors.black87
+                                                  : Colors.white,
+                                            ),
+                                          )
+                                        : null),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                opt.name,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w900
+                                      : FontWeight.w600,
+                                  color: isSelected
+                                      ? PixelColors.primaryBlueDark
+                                      : PixelColors.textDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                    PixelButton(
+                      text: '완료',
+                      height: 42,
+                      withSparkle: false,
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -703,6 +864,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           context,
                           MaterialPageRoute(
                               builder: (_) => const TimelineScreen()));
+                    } else if (value == 'change_color') {
+                      _showColorChangeDialog(userId, character);
                     } else if (value == 'logout') {
                       _handleLogout();
                     } else if (value == 'delete_account') {
@@ -753,6 +916,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                    if (character.characterType.paletteOptions.isNotEmpty)
+                      PopupMenuItem(
+                        value: 'change_color',
+                        child: Row(
+                          children: [
+                            Icon(
+                              character.characterType == CharacterType.capybara
+                                  ? Icons.tune_rounded
+                                  : Icons.palette_rounded,
+                              size: 18,
+                              color: PixelColors.primaryBlue,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              character.characterType == CharacterType.capybara
+                                  ? '브라운 톤 조절'
+                                  : '캐릭터 색상 변경',
+                            ),
+                          ],
+                        ),
+                      ),
                     const PopupMenuDivider(),
                     const PopupMenuItem(
                       value: 'reset',

@@ -25,6 +25,7 @@ class PixelAnimalView extends StatefulWidget {
   final double size;
   final bool animated;
   final Color? customColor;
+  final String? paletteKey;
   final bool enableRoam;
   final PetBehavior? forcedBehavior;
   final int actionTrigger;
@@ -36,6 +37,7 @@ class PixelAnimalView extends StatefulWidget {
     this.size = 200,
     this.animated = true,
     this.customColor,
+    this.paletteKey,
     this.enableRoam = false,
     this.forcedBehavior,
     this.actionTrigger = 0,
@@ -306,7 +308,10 @@ class _PixelAnimalViewState extends State<PixelAnimalView>
                           width: size * 0.88,
                           height: size * 0.88,
                           child: Image.asset(
-                            widget.characterType.getAssetPath(stage: 'baby'),
+                            widget.characterType.getAssetPath(
+                              stage: 'baby',
+                              paletteKey: widget.paletteKey,
+                            ),
                             fit: BoxFit.contain,
                             filterQuality: FilterQuality.none,
                           ),

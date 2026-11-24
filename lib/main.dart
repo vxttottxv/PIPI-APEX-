@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config/kakao_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/character_provider.dart';
 import 'providers/task_provider.dart';
@@ -15,6 +17,12 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   // Flutter 바인딩 초기화
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 카카오 공식 SDK 초기화 (모바일 네이티브 키 및 웹 JavaScript 키 동시 등록)
+  await KakaoSdk.init(
+    nativeAppKey: KakaoConfig.nativeAppKey,
+    javaScriptAppKey: KakaoConfig.javascriptAppKey,
+  );
 
   // 실제 휴대폰 알람 서비스 & 한국 시간대 초기화
   await NotificationService.instance.initialize();

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,16 +29,19 @@ class ApiClient {
   static const String _tokenKey = 'pipi_api_bearer_token';
   static const Duration _timeout = Duration(seconds: 4);
 
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+    iOptions: IOSOptions.defaultOptions,
+  );
+
   String get baseUrl {
     const defined = String.fromEnvironment('API_BASE_URL');
     if (defined.isNotEmpty) return defined;
+    // 스마트폰 QR 접속 시: 접속한 호스트(예: http://192.168.x.x:3000)를 자동으로 Base URL로 사용
     if (kIsWeb) {
       final origin = Uri.base;
-      if (origin.host.endsWith('github.io')) {
-        return '';
-      }
-      if ((origin.scheme == 'http' || origin.scheme == 'https') &&
-          origin.port != 8080) {
+      if (origin.host.isNotEmpty &&
+          (origin.scheme == 'http' || origin.scheme == 'https')) {
         return origin.origin;
       }
       return 'http://localhost:3000';
@@ -45,22 +49,70 @@ class ApiClient {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:3000';
     }
+    // iOS 시뮬레이터 및 로컬 기본값
     return 'http://localhost:3000';
   }
 
+  /// 보안 저장소(FlutterSecureStorage)에서 인증 토큰을 안전하게 조회합니다.
+  /// 
+  /// [무중단 마이그레이션]:
+  /// 1. 보안 저장소에 토큰이 있으면 즉시 반환
+  /// 2. 없으면 기존 SharedPreferences 평문 토큰 확인
+  /// 3. 기존 토큰 발견 시 보안 저장소에 먼저 기록 후 재검증(Read-after-Write)
+  /// 4. 검증 성공 시에만 기존 평문 토큰 삭제 (실패 시 보존하여 로그인 유지)
   Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    try {
+      final secureToken = await _secureStorage.read(key: _tokenKey);
+      if (secureToken != null && secureToken.isNotEmpty) {
+        return secureToken;
+      }
+    } catch (_) {}
+
+    // 2. 레거시 SharedPreferences 저장소 확인
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final legacyToken = prefs.getString(_tokenKey);
+      if (legacyToken != null && legacyToken.isNotEmpty) {
+        // 보안 저장소로 안전 이전 (기록 후 정상 저장 여부 검증)
+        await _secureStorage.write(key: _tokenKey, value: legacyToken);
+        final verified = await _secureStorage.read(key: _tokenKey);
+        if (verified == legacyToken) {
+          // 검증 완료된 경우에만 레거시 평문 토큰 안전 삭제
+          await prefs.remove(_tokenKey);
+        }
+        return legacyToken;
+      }
+    } catch (_) {
+      // 보안 저장소 기록 또는 검증 예외 시 레거시 토큰 삭제하지 않고 보존
+    }
+    return null;
   }
 
+  /// 발급받은 인증 토큰을 보안 저장소에 암호화하여 저장합니다.
   Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+      final verified = await _secureStorage.read(key: _tokenKey);
+      if (verified == token) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_tokenKey);
+      }
+    } catch (_) {
+      // 보안 저장소 예외 발생 시 SharedPreferences에 폴백 저장하여 인증 유지
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+    }
   }
 
+  /// 로그아웃 또는 계정 삭제 시 보안 저장소 및 레거시 저장소의 토큰을 모두 정리합니다.
   Future<void> clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+    } catch (_) {}
   }
 
   /// 백엔드 HTTP 요청 실행

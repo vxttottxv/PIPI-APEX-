@@ -39,28 +39,14 @@ class CharacterView extends StatelessWidget {
     this.onBehaviorChanged,
   });
 
-  Color? _resolveColor() {
-    if (customColor != null) return customColor;
-    if (colorHex != null && colorHex!.isNotEmpty) {
-      final clean = colorHex!.replaceFirst('#', '');
-      try {
-        if (clean.length == 6) {
-          return Color(int.parse('FF$clean', radix: 16));
-        } else if (clean.length == 8) {
-          return Color(int.parse(clean, radix: 16));
-        }
-      } catch (_) {}
-    }
-    return accentColor;
-  }
-
   @override
   Widget build(BuildContext context) {
     return PixelAnimalView(
       characterType: characterType,
       size: size,
       animated: animated,
-      customColor: _resolveColor(),
+      customColor: customColor ?? accentColor,
+      paletteKey: colorHex,
       enableRoam: enableRoam,
       forcedBehavior: forcedBehavior,
       actionTrigger: actionTrigger,

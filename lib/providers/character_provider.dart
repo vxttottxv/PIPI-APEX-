@@ -99,6 +99,15 @@ class CharacterProvider with ChangeNotifier {
     }
   }
 
+  /// 로컬 전용 캐릭터 색상 변경 (서버 DB/API 변경 없이 오직 로컬 저장소에만 즉시 반영)
+  Future<void> updateLocalColor(String userId, String colorHex) async {
+    await _characterRepository.saveLocalCharacterColor(userId, colorHex);
+    if (_character != null) {
+      _character = _character!.copyWith(color: colorHex);
+      notifyListeners();
+    }
+  }
+
   /// 간식 주기 (명세서 4-8, 4-9)
   /// 간식을 소모하여 친밀감과 경험치를 획득
   Future<bool> feedSnack(String userId) async {

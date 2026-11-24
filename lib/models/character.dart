@@ -139,55 +139,209 @@ enum CharacterType {
     }
   }
 
-  /// 캐릭터 기본 에셋 경로 반환 (성장단계 포함)
-  String getAssetPath({String stage = 'baby'}) {
+  /// 캐릭터 기본 에셋 경로 반환 (성장단계 및 맞춤형 팔레트 지원)
+  String getAssetPath({String stage = 'baby', String? paletteKey}) {
+    // 오리(duck)는 명세상 항상 기본 오리지널 에셋 유지
+    if (this == CharacterType.duck) {
+      return 'assets/characters/duck_$stage.png';
+    }
+
+    if (paletteKey != null && paletteKey.isNotEmpty) {
+      final key = paletteKey.trim().toLowerCase();
+
+      // 'default', 'none', '#default' 등 원래 색 옵션이거나 미지정인 경우 원본 에셋 반환
+      if (key == 'default' || key == '#default' || key == 'none' || key == '#ffffff') {
+        return 'assets/characters/${name}_$stage.png';
+      }
+
+      // paletteOptions 중 id 또는 hex가 일치하는 옵션 탐색
+      final matched = paletteOptions.cast<CharacterPaletteOption?>().firstWhere(
+        (opt) =>
+            opt != null &&
+            (opt.id.toLowerCase() == key ||
+                opt.hex.toLowerCase() == key ||
+                opt.hex.toLowerCase().replaceFirst('#', '') ==
+                    key.replaceFirst('#', '')),
+        orElse: () => null,
+      );
+
+      if (matched != null) {
+        if (matched.id == 'default' || matched.isDefault) {
+          return 'assets/characters/${name}_$stage.png';
+        }
+        return 'assets/characters/${name}_${matched.id}.png';
+      }
+    }
+
+    // fallback: 원본 스프라이트 반환
     return 'assets/characters/${name}_$stage.png';
   }
 
-  /// 컬러 팔레트 선택지 (명세서: 컬러 팔레트로 색/품종 선택)
+  /// 캐릭터별 맞춤형 컬러 팔레트 선택지
+  /// - 맨 첫 번째 옵션은 항상 '원래 색 (오리지널, default)'
+  /// - 오리: 컬러 피커 미제공 (empty)
+  /// - 카피바라: 원래 색 + 브라운 계열 4단계 명도 톤 조절
+  /// - 드래곤 / 시바견 / 고양이: 원래 색 + 부위별 정밀 매핑 5대 팔레트
   List<CharacterPaletteOption> get paletteOptions {
     switch (this) {
       case CharacterType.cat:
         return const [
-          CharacterPaletteOption(name: '스노우 화이트', hex: '#FFFFFF', color: Color(0xFFFFFFFF)),
-          CharacterPaletteOption(name: '크림 바닐라', hex: '#FFF3E0', color: Color(0xFFFFF3E0)),
-          CharacterPaletteOption(name: '챠콜 그레이', hex: '#616161', color: Color(0xFF616161)),
-          CharacterPaletteOption(name: '파스텔 피치', hex: '#FFCCBC', color: Color(0xFFFFCCBC)),
+          CharacterPaletteOption(
+            id: 'default',
+            name: '원래 색 (오리지널)',
+            hex: 'default',
+            color: Color(0xFFFCF2EC),
+            isDefault: true,
+          ),
+          CharacterPaletteOption(
+            id: 'cheese_tabby',
+            name: '치즈 태비',
+            hex: '#FFD180',
+            color: Color(0xFFFFD180),
+          ),
+          CharacterPaletteOption(
+            id: 'tuxedo_black',
+            name: '턱시도 블랙',
+            hex: '#3D405B',
+            color: Color(0xFF3D405B),
+          ),
+          CharacterPaletteOption(
+            id: 'russian_blue',
+            name: '러시안 블루',
+            hex: '#B8C5D6',
+            color: Color(0xFFB8C5D6),
+          ),
+          CharacterPaletteOption(
+            id: 'lavender_siamese',
+            name: '라벤더 샴',
+            hex: '#EFE9F4',
+            color: Color(0xFFEFE9F4),
+          ),
+          CharacterPaletteOption(
+            id: 'cafe_mocha',
+            name: '카페모카',
+            hex: '#D4A373',
+            color: Color(0xFFD4A373),
+          ),
         ];
       case CharacterType.dog:
         return const [
-          CharacterPaletteOption(name: '골든 허니', hex: '#E8B872', color: Color(0xFFE8B872)),
-          CharacterPaletteOption(name: '밀크 크림', hex: '#FFF8E1', color: Color(0xFFFFF8E1)),
-          CharacterPaletteOption(name: '초코 브라운', hex: '#795548', color: Color(0xFF795548)),
-          CharacterPaletteOption(name: '샴페인 골드', hex: '#FFE082', color: Color(0xFFFFE082)),
+          CharacterPaletteOption(
+            id: 'default',
+            name: '원래 색 (오리지널)',
+            hex: 'default',
+            color: Color(0xFFFBC091),
+            isDefault: true,
+          ),
+          CharacterPaletteOption(
+            id: 'honey_shiba',
+            name: '허니 시바',
+            hex: '#F6BD60',
+            color: Color(0xFFF6BD60),
+          ),
+          CharacterPaletteOption(
+            id: 'black_tan',
+            name: '블랙탄',
+            hex: '#424656',
+            color: Color(0xFF424656),
+          ),
+          CharacterPaletteOption(
+            id: 'white_snow',
+            name: '백시바',
+            hex: '#F2F4F8',
+            color: Color(0xFFF2F4F8),
+          ),
+          CharacterPaletteOption(
+            id: 'sesame',
+            name: '세서미',
+            hex: '#BC8A5F',
+            color: Color(0xFFBC8A5F),
+          ),
+          CharacterPaletteOption(
+            id: 'strawberry_milk',
+            name: '스트로베리 밀크',
+            hex: '#FFC2D1',
+            color: Color(0xFFFFC2D1),
+          ),
         ];
       case CharacterType.capybara:
         return const [
-          CharacterPaletteOption(name: '클래식 브라운', hex: '#A67B5B', color: Color(0xFFA67B5B)),
-          CharacterPaletteOption(name: '샌드 베이지', hex: '#D7CCC8', color: Color(0xFFD7CCC8)),
-          CharacterPaletteOption(name: '웜 모카', hex: '#8D6E63', color: Color(0xFF8D6E63)),
-          CharacterPaletteOption(name: '유자 골드', hex: '#FFA000', color: Color(0xFFFFA000)),
+          CharacterPaletteOption(
+            id: 'default',
+            name: '원래 색 (오리지널)',
+            hex: 'default',
+            color: Color(0xFFF4A162),
+            isDefault: true,
+          ),
+          CharacterPaletteOption(
+            id: 'capy_light',
+            name: '라이트 허니',
+            hex: '#F8B880',
+            color: Color(0xFFF8B880),
+          ),
+          CharacterPaletteOption(
+            id: 'capy_caramel',
+            name: '캐러멜 브라운',
+            hex: '#DE8645',
+            color: Color(0xFFDE8645),
+          ),
+          CharacterPaletteOption(
+            id: 'capy_deep',
+            name: '딥 체스넛',
+            hex: '#BD6633',
+            color: Color(0xFFBD6633),
+          ),
+          CharacterPaletteOption(
+            id: 'capy_dark',
+            name: '다크 에스프레소',
+            hex: '#8C4724',
+            color: Color(0xFF8C4724),
+          ),
         ];
       case CharacterType.duck:
-        return const [
-          CharacterPaletteOption(name: '스노우 마린', hex: '#FFFFFF', color: Color(0xFFFFFFFF)),
-          CharacterPaletteOption(name: '레몬 버터', hex: '#FFF59D', color: Color(0xFFFFF59D)),
-          CharacterPaletteOption(name: '오션 민트', hex: '#B2DFDB', color: Color(0xFFB2DFDB)),
-          CharacterPaletteOption(name: '베이비 스카이', hex: '#BBDEFB', color: Color(0xFFBBDEFB)),
-        ];
+        // 명세: 오리는 컬러 피커 제거 및 항상 오리지널 에셋 유지
+        return const [];
       case CharacterType.axolotl:
-        return const [
-          CharacterPaletteOption(name: '러블리 핑크', hex: '#F8BBD0', color: Color(0xFFF8BBD0)),
-          CharacterPaletteOption(name: '베이비 라벤더', hex: '#E1BEE7', color: Color(0xFFE1BEE7)),
-          CharacterPaletteOption(name: '파스텔 아쿠아', hex: '#B2EBF2', color: Color(0xFFB2EBF2)),
-          CharacterPaletteOption(name: '코랄 선셋', hex: '#FFCCBC', color: Color(0xFFFFCCBC)),
-        ];
+        return const [];
       case CharacterType.dragon:
         return const [
-          CharacterPaletteOption(name: '섀도우 퍼플', hex: '#4A3B52', color: Color(0xFF4A3B52)),
-          CharacterPaletteOption(name: '옵시디언 블랙', hex: '#263238', color: Color(0xFF263238)),
-          CharacterPaletteOption(name: '미드나잇 네이비', hex: '#1A237E', color: Color(0xFF1A237E)),
-          CharacterPaletteOption(name: '에메랄드 다크', hex: '#1B5E20', color: Color(0xFF1B5E20)),
+          CharacterPaletteOption(
+            id: 'default',
+            name: '원래 색 (오리지널)',
+            hex: 'default',
+            color: Color(0xFFFCE5D6),
+            isDefault: true,
+          ),
+          CharacterPaletteOption(
+            id: 'cream_peach',
+            name: '크림 피치',
+            hex: '#FFD8BE',
+            color: Color(0xFFFFD8BE),
+          ),
+          CharacterPaletteOption(
+            id: 'sunshine_gold',
+            name: '썬샤인 골드',
+            hex: '#FFE680',
+            color: Color(0xFFFFE680),
+          ),
+          CharacterPaletteOption(
+            id: 'lavender_sugar',
+            name: '라벤더 슈가',
+            hex: '#D8C3FF',
+            color: Color(0xFFD8C3FF),
+          ),
+          CharacterPaletteOption(
+            id: 'strawberry_milk',
+            name: '스트로베리 밀크',
+            hex: '#FFC2D1',
+            color: Color(0xFFFFC2D1),
+          ),
+          CharacterPaletteOption(
+            id: 'charcoal_black',
+            name: '차콜 블랙',
+            hex: '#3E4251',
+            color: Color(0xFF3E4251),
+          ),
         ];
     }
   }
@@ -195,14 +349,18 @@ enum CharacterType {
 
 /// 캐릭터 컬러 옵션 클래스
 class CharacterPaletteOption {
+  final String id;
   final String name;
   final String hex;
   final Color color;
+  final bool isDefault;
 
   const CharacterPaletteOption({
+    required this.id,
     required this.name,
     required this.hex,
     required this.color,
+    this.isDefault = false,
   });
 }
 

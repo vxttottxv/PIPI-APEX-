@@ -13,10 +13,32 @@ import 'auth_repository.dart';
 /// 3. 한번 선택된 캐릭터는 영구 고정되어 육성되므로 저장 유무를 정확하게 판별
 class CharacterRepository {
   static const String _characterKeySuffix = 'character_data';
+  static const String _customColorSuffix = 'character_custom_color';
 
   /// 사용자 ID 기반 분리 저장 키 생성
   String _getUserCharacterKey(String userId) {
     return AuthRepository.getUserStorageKey(userId, _characterKeySuffix);
+  }
+
+  /// 사용자 ID 기반 로컬 커스텀 색상 저장 키 생성
+  String _getUserColorKey(String userId) {
+    return AuthRepository.getUserStorageKey(userId, _customColorSuffix);
+  }
+
+  /// 로컬 전용 캐릭터 색상 저장 (서버 DB/API 변경 없이 오직 로컬 SharedPreferences에만 영구 보관)
+  Future<void> saveLocalCharacterColor(String userId, String colorHex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _getUserColorKey(userId);
+    await prefs.setString(key, colorHex);
+  }
+
+  /// 로컬에 저장된 캐릭터 색상 조회 (없거나 비어있으면 null)
+  Future<String?> getLocalCharacterColor(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _getUserColorKey(userId);
+    final val = prefs.getString(key);
+    if (val == null || val.trim().isEmpty) return null;
+    return val.trim();
   }
 
   /// 사용자의 저장된 캐릭터 정보 조회
@@ -26,37 +48,47 @@ class CharacterRepository {
     final prefs = await SharedPreferences.getInstance();
     final key = _getUserCharacterKey(userId);
 
+    Character? character;
+
     // 백엔드 API 조회 시도 (토큰이 있는 로그인 세션일 때)
     final token = await ApiClient.instance.getToken();
     if (token != null && token.isNotEmpty) {
       try {
         final apiRes = await ApiClient.instance.request('GET', '/api/character');
         if (apiRes != null) {
-          final character = Character.fromJson(apiRes);
+          character = Character.fromJson(apiRes);
           await prefs.setString(key, jsonEncode(character.toJson()));
-          return character;
         }
       } on ApiHttpException catch (e) {
         if (e.statusCode == 404) {
           await prefs.remove(key);
+          await prefs.remove(_getUserColorKey(userId));
           return null;
         }
       }
     }
 
-    final jsonStr = prefs.getString(key);
-
-    if (jsonStr == null || jsonStr.isEmpty) {
-      return null;
+    if (character == null) {
+      final jsonStr = prefs.getString(key);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        try {
+          final Map<String, dynamic> data = jsonDecode(jsonStr);
+          character = Character.fromJson(data);
+        } catch (_) {
+          return null;
+        }
+      }
     }
 
-    try {
-      final Map<String, dynamic> data = jsonDecode(jsonStr);
-      return Character.fromJson(data);
-    } catch (e) {
-      // JSON 파싱 실패 시 안전하게 null 반환
-      return null;
+    if (character != null) {
+      // 로컬에 저장된 커스텀 색상이 있으면 우선 반영 (서버 DB 변경 없이 로컬 설정 유지)
+      final localColor = await getLocalCharacterColor(userId);
+      if (localColor != null && localColor.isNotEmpty) {
+        character = character.copyWith(color: localColor);
+      }
     }
+
+    return character;
   }
 
   /// 캐릭터 최초 생성 및 저장 (한번 저장 시 고정)
@@ -68,6 +100,9 @@ class CharacterRepository {
     final key = _getUserCharacterKey(userId);
     final payload = character.toJson();
     await prefs.setString(key, jsonEncode(payload));
+
+    // 로컬 전용 색상 키에도 동시 저장
+    await saveLocalCharacterColor(userId, character.color);
 
     final token = await ApiClient.instance.getToken();
     if (token != null && token.isNotEmpty) {
@@ -100,5 +135,6 @@ class CharacterRepository {
     final prefs = await SharedPreferences.getInstance();
     final key = _getUserCharacterKey(userId);
     await prefs.remove(key);
+    await prefs.remove(_getUserColorKey(userId));
   }
 }

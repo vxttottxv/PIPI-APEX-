@@ -20,6 +20,7 @@ class CharacterSelectionScreen extends StatefulWidget {
 class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
   final _nameController = TextEditingController();
   int _currentIndex = 0;
+  int _selectedColorIndex = 0;
 
   CharacterType get _selectedType => CharacterType.values[_currentIndex];
   CharacterType get _nextType =>
@@ -59,6 +60,7 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
       _currentIndex =
           (_currentIndex - 1 + CharacterType.values.length) %
           CharacterType.values.length;
+      _selectedColorIndex = 0;
       _nameController.text = _defaultNameFor(_selectedType);
     });
   }
@@ -66,6 +68,7 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
   void _nextCharacter() {
     setState(() {
       _currentIndex = (_currentIndex + 1) % CharacterType.values.length;
+      _selectedColorIndex = 0;
       _nameController.text = _defaultNameFor(_selectedType);
     });
   }
@@ -268,12 +271,18 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
 
     if (userId == null) return;
 
-    final defaultPalette = _selectedType.paletteOptions.first;
+    final options = _selectedType.paletteOptions;
+    final chosenPalette =
+        options.isNotEmpty && _selectedColorIndex < options.length
+            ? options[_selectedColorIndex]
+            : null;
+    final colorHex = chosenPalette?.id ?? 'default';
+
     final success = await characterProvider.selectCharacter(
       userId: userId,
       type: _selectedType,
       name: name,
-      colorHex: defaultPalette.hex,
+      colorHex: colorHex,
     );
 
     if (!mounted) return;
@@ -315,7 +324,7 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                     children: [
                       // 좌측: 초대형 캐릭터 쇼케이스 픽셀 카드 (이중 픽셀 테두리)
                       Expanded(
-                        flex: 6,
+                        flex: 11,
                         child: PixelBox(
                           step: 6.0,
                           shadowOffset: 5.0,
@@ -325,19 +334,30 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                           doubleBorder: true,
                           innerBorderColor: PixelColors.primaryBlueLight,
                           child: Center(
-                            child: CharacterView(
-                              characterType: _selectedType,
-                              size: 210,
-                              animated: true,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final size = (constraints.maxWidth * 0.95).clamp(140.0, 210.0);
+                                final options = _selectedType.paletteOptions;
+                                final currentPalette =
+                                    options.isNotEmpty && _selectedColorIndex < options.length
+                                        ? options[_selectedColorIndex]
+                                        : null;
+                                return CharacterView(
+                                  characterType: _selectedType,
+                                  size: size,
+                                  animated: true,
+                                  colorHex: currentPalette?.id ?? 'default',
+                                );
+                              },
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
 
                       // 우측: 동물 선택 버튼 & 다음 캐릭터 프리뷰
                       Expanded(
-                        flex: 5,
+                        flex: 10,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -364,8 +384,8 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   PixelBox(
-                                    width: 32,
-                                    height: 36,
+                                    width: 28,
+                                    height: 34,
                                     step: 2.5,
                                     shadowOffset: 1.5,
                                     backgroundColor:
@@ -379,7 +399,7 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                                         alignment: Alignment.center,
                                         children: [
                                           PixelIcon(PixelIconType.triangleLeft,
-                                              size: 16),
+                                              size: 15),
                                           Opacity(
                                             opacity: 0.0,
                                             child: Icon(
@@ -390,20 +410,27 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                                       ),
                                     ),
                                   ),
-                                  Flexible(
-                                    child: Text(
-                                      _selectedType.koreanName,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w900,
-                                        color: PixelColors.textDark,
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          _selectedType.koreanName,
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w900,
+                                            color: PixelColors.textDark,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   PixelBox(
-                                    width: 32,
-                                    height: 36,
+                                    width: 28,
+                                    height: 34,
                                     step: 2.5,
                                     shadowOffset: 1.5,
                                     backgroundColor:
@@ -417,7 +444,7 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                                         alignment: Alignment.center,
                                         children: [
                                           PixelIcon(PixelIconType.triangleRight,
-                                              size: 16),
+                                              size: 15),
                                           Opacity(
                                             opacity: 0.0,
                                             child: Icon(
@@ -432,7 +459,142 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                               ),
                             ),
 
-                            const SizedBox(height: 22),
+                            if (_selectedType.paletteOptions.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+
+                              // 색상/톤 선택 팔레트 스와치 영역
+                              PixelBox(
+                                step: 3.5,
+                                shadowOffset: 2.5,
+                                lipHeight: 2.0,
+                                backgroundColor: Colors.white,
+                                lipColor: const Color(0xFFDCEBFC),
+                                borderColor: PixelColors.borderDark,
+                                borderWidth: 2.0,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 6),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              _selectedType == CharacterType.capybara ? '🦫' : '🎨',
+                                              style: const TextStyle(fontSize: 11),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _selectedType == CharacterType.capybara ? '브라운 톤' : '색상 선택',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w900,
+                                                color: PixelColors.textDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Flexible(
+                                          child: Text(
+                                            _selectedType
+                                                .paletteOptions[
+                                                    _selectedColorIndex.clamp(0, _selectedType.paletteOptions.length - 1)]
+                                                .name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: PixelColors.primaryBlueDark,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: List.generate(
+                                      _selectedType.paletteOptions.length,
+                                      (idx) {
+                                        final opt =
+                                            _selectedType.paletteOptions[idx];
+                                        final isSelected =
+                                            _selectedColorIndex == idx;
+                                        return GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedColorIndex = idx;
+                                            });
+                                          },
+                                          child: AnimatedContainer(
+                                            duration: const Duration(
+                                                milliseconds: 150),
+                                            width: isSelected ? 24 : 19,
+                                            height: isSelected ? 24 : 19,
+                                            decoration: BoxDecoration(
+                                              color: opt.color,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? PixelColors.primaryBlueDark
+                                                    : PixelColors.borderDark,
+                                                width: isSelected ? 2.5 : 1.5,
+                                              ),
+                                              boxShadow: isSelected
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: PixelColors
+                                                            .primaryBlueLight
+                                                            .withValues(
+                                                                alpha: 0.8),
+                                                        blurRadius: 4,
+                                                        spreadRadius: 1,
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: opt.isDefault
+                                                ? Center(
+                                                    child: Icon(
+                                                      Icons.auto_awesome,
+                                                      size: isSelected ? 12 : 9,
+                                                      color: opt.color
+                                                                  .computeLuminance() >
+                                                              0.5
+                                                          ? Colors.black87
+                                                          : Colors.white,
+                                                    ),
+                                                  )
+                                                : (isSelected
+                                                    ? Center(
+                                                        child: Icon(
+                                                          Icons.check_rounded,
+                                                          size: 13,
+                                                          color: opt.color
+                                                                      .computeLuminance() >
+                                                                  0.5
+                                                              ? Colors.black87
+                                                              : Colors.white,
+                                                        ),
+                                                      )
+                                                    : null),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                            const SizedBox(height: 10),
 
                             // 다음 캐릭터 뱃지 (시안 6번처럼 상단에 걸친 파란 라벨 + 흰색 알약 박스)
                             Stack(
@@ -455,23 +617,29 @@ class _CharacterSelectionScreenState extends State<CharacterSelectionScreen> {
                                     children: [
                                       const PixelIcon(
                                         PixelIconType.paw,
-                                        size: 16,
+                                        size: 15,
                                         primaryColor:
                                             PixelColors.primaryBlueLight,
                                       ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _nextType.koreanName,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                          color: PixelColors.textDark,
+                                      const SizedBox(width: 5),
+                                      Flexible(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            _nextType.koreanName,
+                                            maxLines: 1,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w900,
+                                              color: PixelColors.textDark,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: 5),
                                       const PixelIcon(
                                         PixelIconType.paw,
-                                        size: 16,
+                                        size: 15,
                                         primaryColor:
                                             PixelColors.primaryBlueLight,
                                       ),
