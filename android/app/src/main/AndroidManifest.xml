@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 네트워크 통신 권한 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 실제 휴대폰 일정 푸시 알람 권한 (Android 13+ 알림, 정확 알람, 재부팅 유지, 진동) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
@@ -37,6 +39,30 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- 카카오 로그인 Redirect URI 수신용 액티비티 설정 -->
+        <activity
+            android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kakao${KAKAO_NATIVE_APP_KEY}" android:host="oauth"/>
+            </intent-filter>
+        </activity>
+
+        <!-- 카카오 SDK CustomTabs 호환 액티비티 -->
+        <activity
+            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kakao${KAKAO_NATIVE_APP_KEY}" android:host="oauth"/>
+            </intent-filter>
+        </activity>
 
         <!-- 앱 종료/재부팅 후에도 예약된 알람이 울리도록 수신기 등록 -->
         <receiver
